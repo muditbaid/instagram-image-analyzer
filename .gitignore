@@ -1,0 +1,27 @@
+# Ignore large folders
+login_images/
+downloaded_images/
+images/
+test_images/
+
+# Ignore data files
+*.xlsx
+*.csv
+urls.txt
+
+# Ignore sensitive files
+.env
+*.env
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore IDE settings
+.vscode/
+.idea/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
