@@ -177,104 +177,82 @@ elif page == "🔑 Get Session ID":
     ---
     """)
     
-    # Check if session already exists
-    sessionid = os.getenv("INSTAGRAM_SESSIONID")
-    if sessionid:
+    # Check if session already exists in .env file
+    env_path = Path(".env")
+    sessionid = None
+    if env_path.exists():
+        env_content = env_path.read_text()
+        import re
+        match = re.search(r'INSTAGRAM_SESSIONID=(.+)', env_content)
+        if match:
+            sessionid = match.group(1).strip()
+    
+    if sessionid and len(sessionid) > 10:
         st.success("Session ID already saved! You're all set.")
+        st.info("You can proceed to Download Images.")
     else:
         if 'chrome_opened' not in st.session_state:
             st.session_state.chrome_opened = False
         
-        if not st.session_state.chrome_opened:
+        # Simple message to run script directly
+        st.markdown("""
+        ### Method 1: Auto Script (Recommended)
+        
+        1. Open Command Prompt or PowerShell
+        2. Go to this folder: `cd "C:\\Users\\mb05005\\OneDrive - University of Georgia\\UGA\\Dr. Itai\\Instagram\\Image Analysis"`
+        3. Run this command:
+        
+        ```
+        python get_session.py
+        ```
+        
+        The script will:
+        - Open Chrome
+        - Log you into Instagram (first time only)
+        - Save session ID automatically
+        
+        After running, refresh this page.
+        """)
+        
+        st.markdown("---")
+        
+        with st.expander("Method 2: Manual Instructions"):
             st.markdown("""
-            ### Step 1: Open Chrome
+            ### Manual Method
             
-            Click the button below to open Chrome with Instagram.
+            1. Open Chrome and go to **instagram.com**
+            2. Make sure you're logged in
+            3. Press **F12** to open Developer Tools
+            4. Click **Application** tab
+            5. Click **Cookies** → **instagram.com**
+            6. Scroll down and find **sessionid**
+            7. Copy the **Value** column
+            8. Paste it below:
             """)
             
-            if st.button("🌐 Open Instagram in Chrome", type="primary"):
-                import subprocess
-                import sys
-                
-                # Run a simpler script that just opens Chrome
-                subprocess.Popen([sys.executable, "-c", 
-                    "from selenium import webdriver; "
-                    "from selenium.webdriver.chrome.options import Options; "
-                    "from webdriver_manager.chrome import ChromeDriverManager; "
-                    "from selenium.webdriver.chrome.service import Service; "
-                    "options = Options(); "
-                    "options.add_argument('--disable-blink-features=AutomationControlled'); "
-                    "options.add_argument('--no-sandbox'); "
-                    "driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options); "
-                    "driver.get('https://www.instagram.com')"
-                ])
-                
-                st.session_state.chrome_opened = True
-                st.rerun()
-        else:
-            st.success("Chrome is open! Now log in to Instagram.")
+            manual_input = st.text_input(
+                "Paste session ID here:",
+                placeholder="Paste the session ID...",
+                type="password",
+                key="manual_session"
+            )
             
-            st.markdown("""
-            ### Step 2: Log in to Instagram
-            
-            1. In the Chrome window that opened, log in to your Instagram account
-            2. Wait for your feed to load
-            3. Come back here and click the button below
-            """)
-            
-            if st.button("✅ I'm logged in - Get Session ID", type="primary"):
-                with st.spinner("Getting session ID..."):
-                    import subprocess
-                    import sys
-                    import re
+            if manual_input:
+                if st.button("💾 Save Session ID"):
+                    env_path = Path(".env")
+                    existing = ""
+                    if env_path.exists():
+                        existing = env_path.read_text()
                     
-                    # Run script to get session from existing Chrome
-                    result = subprocess.run(
-                        [sys.executable, "-c", 
-                            "from selenium import webdriver; "
-                            "from selenium.webdriver.chrome.options import Options; "
-                            "from webdriver_manager.chrome import ChromeDriverManager; "
-                            "from selenium.webdriver.chrome.service import Service; "
-                            "options = Options(); "
-                            "options.add_argument('--disable-blink-features=AutomationControlled'); "
-                            "options.add_argument('--no-sandbox'); "
-                            "driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options); "
-                            "driver.get('https://www.instagram.com'); "
-                            "import time; time.sleep(2); "
-                            "cookies = driver.get_cookies(); "
-                            "for c in cookies: "
-                            "    if c['name'] == 'sessionid' and c['value']: "
-                            "        print(c['value']); "
-                            "        break; "
-                            "driver.quit()"
-                        ],
-                        capture_output=True,
-                        text=True
-                    )
-                    
-                    session_id = result.stdout.strip()
-                    
-                    if session_id and len(session_id) > 10:
-                        env_path = Path(".env")
-                        existing = ""
-                        if env_path.exists():
-                            existing = env_path.read_text()
-                        
-                        if "INSTAGRAM_SESSIONID=" in existing:
-                            existing = re.sub(r'INSTAGRAM_SESSIONID=.*', f'INSTAGRAM_SESSIONID={session_id}', existing)
-                        else:
-                            existing += f"\nINSTAGRAM_SESSIONID={session_id}\n"
-                        
-                        env_path.write_text(existing.strip() + "\n")
-                        st.session_state.chrome_opened = False
-                        st.success("Session ID saved! You can close Chrome now.")
-                        st.balloons()
+                    if "INSTAGRAM_SESSIONID=" in existing:
+                        existing = re.sub(r'INSTAGRAM_SESSIONID=.*', f'INSTAGRAM_SESSIONID={manual_input}', existing)
                     else:
-                        st.error("Could not find session. Make sure you're logged in to Instagram.")
-            
-            if st.button("🔄 Start Over"):
-                st.session_state.chrome_opened = False
-                st.rerun()
+                        existing += f"\nINSTAGRAM_SESSIONID={manual_input}\n"
+                    
+                    env_path.write_text(existing.strip() + "\n")
+                    st.success("Session ID saved!")
+
+
 
 
 elif page == "📥 Download Images":
