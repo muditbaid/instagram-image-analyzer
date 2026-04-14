@@ -166,76 +166,115 @@ if page == "🏠 About":
 
 elif page == "🔑 Get Session ID":
     st.header("🔑 Get Your Instagram Session ID")
-    st.markdown("*Optional - helps with reliable downloads*")
     
-    st.markdown("---")
     st.markdown("""
-    ### What is a Session ID?
+    ### What is this?
     
-    A session ID is a cookie that proves you're logged into Instagram.
+    This helps downloads work better. Without it, some images may fail.
     
-    - **With session ID**: ~100% download success
-    - **Without session ID**: ~90% download success
-    
-    Downloads work fine without it, but some posts may fail.
+    This is **optional** - downloads work 90% of the time without it.
     
     ---
-    
-    ### How to Get Your Session ID
     """)
     
-    st.markdown("""
-    **Step 1:** Open Chrome and go to **instagram.com**
-    
-    **Step 2:** Log in to your account
-    
-    **Step 3:** Press **F12** on your keyboard to open Developer Tools
-    
-    **Step 4:** Click the **Application** tab at the top of Developer Tools
-    
-    **Step 5:** Click **Cookies** then **instagram.com**
-    
-    **Step 6:** Find **sessionid** in the list and copy the **Value** column
-    """)
-    
-    st.markdown("""
-    **Step 4:** Click the **Application** tab (at the top of DevTools)
-    
-    **Step 5:** In the left panel, click **Cookies** then **instagram.com**
-    
-    **Step 6:** Scroll down and find **sessionid** in the list
-    
-    **Step 7:** Double-click the **Value** column and copy it
-    """)
-    
-    st.markdown("---")
-    
-    st.markdown("### Save Your Session ID")
-    
-    session_input = st.text_input(
-        "Paste your session ID here:",
-        placeholder="Paste the value you copied from Chrome...",
-        type="password"
-    )
-    
-    if session_input:
-        if st.button("💾 Save Session ID", type="primary"):
-            env_path = Path(".env")
-            existing = ""
-            if env_path.exists():
-                existing = env_path.read_text()
+    # Check if session already exists
+    sessionid = os.getenv("INSTAGRAM_SESSIONID")
+    if sessionid:
+        st.success("Session ID already saved! You're all set.")
+    else:
+        if 'chrome_opened' not in st.session_state:
+            st.session_state.chrome_opened = False
+        
+        if not st.session_state.chrome_opened:
+            st.markdown("""
+            ### Step 1: Open Chrome
             
-            if "INSTAGRAM_SESSIONID=" in existing:
-                import re
-                existing = re.sub(r'INSTAGRAM_SESSIONID=.*', f'INSTAGRAM_SESSIONID={session_input}', existing)
-            else:
-                existing += f"\nINSTAGRAM_SESSIONID={session_input}\n"
+            Click the button below to open Chrome with Instagram.
+            """)
             
-            env_path.write_text(existing.strip() + "\n")
+            if st.button("🌐 Open Instagram in Chrome", type="primary"):
+                import subprocess
+                import sys
+                
+                # Run a simpler script that just opens Chrome
+                subprocess.Popen([sys.executable, "-c", 
+                    "from selenium import webdriver; "
+                    "from selenium.webdriver.chrome.options import Options; "
+                    "from webdriver_manager.chrome import ChromeDriverManager; "
+                    "from selenium.webdriver.chrome.service import Service; "
+                    "options = Options(); "
+                    "options.add_argument('--disable-blink-features=AutomationControlled'); "
+                    "options.add_argument('--no-sandbox'); "
+                    "driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options); "
+                    "driver.get('https://www.instagram.com')"
+                ])
+                
+                st.session_state.chrome_opened = True
+                st.rerun()
+        else:
+            st.success("Chrome is open! Now log in to Instagram.")
             
-            st.success("✅ Session ID saved to .env file!")
-            st.balloons()
-            st.markdown("**Go to Download Images page when ready!**")
+            st.markdown("""
+            ### Step 2: Log in to Instagram
+            
+            1. In the Chrome window that opened, log in to your Instagram account
+            2. Wait for your feed to load
+            3. Come back here and click the button below
+            """)
+            
+            if st.button("✅ I'm logged in - Get Session ID", type="primary"):
+                with st.spinner("Getting session ID..."):
+                    import subprocess
+                    import sys
+                    import re
+                    
+                    # Run script to get session from existing Chrome
+                    result = subprocess.run(
+                        [sys.executable, "-c", 
+                            "from selenium import webdriver; "
+                            "from selenium.webdriver.chrome.options import Options; "
+                            "from webdriver_manager.chrome import ChromeDriverManager; "
+                            "from selenium.webdriver.chrome.service import Service; "
+                            "options = Options(); "
+                            "options.add_argument('--disable-blink-features=AutomationControlled'); "
+                            "options.add_argument('--no-sandbox'); "
+                            "driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options); "
+                            "driver.get('https://www.instagram.com'); "
+                            "import time; time.sleep(2); "
+                            "cookies = driver.get_cookies(); "
+                            "for c in cookies: "
+                            "    if c['name'] == 'sessionid' and c['value']: "
+                            "        print(c['value']); "
+                            "        break; "
+                            "driver.quit()"
+                        ],
+                        capture_output=True,
+                        text=True
+                    )
+                    
+                    session_id = result.stdout.strip()
+                    
+                    if session_id and len(session_id) > 10:
+                        env_path = Path(".env")
+                        existing = ""
+                        if env_path.exists():
+                            existing = env_path.read_text()
+                        
+                        if "INSTAGRAM_SESSIONID=" in existing:
+                            existing = re.sub(r'INSTAGRAM_SESSIONID=.*', f'INSTAGRAM_SESSIONID={session_id}', existing)
+                        else:
+                            existing += f"\nINSTAGRAM_SESSIONID={session_id}\n"
+                        
+                        env_path.write_text(existing.strip() + "\n")
+                        st.session_state.chrome_opened = False
+                        st.success("Session ID saved! You can close Chrome now.")
+                        st.balloons()
+                    else:
+                        st.error("Could not find session. Make sure you're logged in to Instagram.")
+            
+            if st.button("🔄 Start Over"):
+                st.session_state.chrome_opened = False
+                st.rerun()
 
 
 elif page == "📥 Download Images":
@@ -244,36 +283,19 @@ elif page == "📥 Download Images":
     
     st.markdown("---")
     
-    # Check if URLs are ready from extraction
-    urls_from_session = st.session_state.get('extracted_urls', [])
+    # Default URLs for quick testing
+    default_urls = """https://www.instagram.com/p/C6b9MUXpO7_/
+https://www.instagram.com/p/C6gPbEDO3_C/
+https://www.instagram.com/reel/C20NPYHJssM/"""
     
-    if urls_from_session:
-        st.success(f"✅ Found {len(urls_from_session)} URLs from Step 1!")
-        st.info("You can use these URLs or paste new ones below.")
-        
-        use_session_urls = st.checkbox("Use URLs from Step 1", value=True)
-        
-        if use_session_urls:
-            url_input = "\n".join(urls_from_session)
-            st.text_area("URLs to download", value=url_input, height=100, disabled=True, label_visibility="collapsed")
-        else:
-            url_input = st.text_area(
-                "Or paste new Instagram URLs here:",
-                placeholder="https://www.instagram.com/p/ABC123xyz/",
-                height=150
-            )
-    else:
-        url_input = st.text_area(
-            "Paste Instagram URLs here:",
-            placeholder="""Paste URLs from your Excel file here...
-
-You can paste multiple URLs, one per line.
-
-Or just go to Step 1 first to extract from Excel!""",
-            height=200
-        )
+    st.markdown("### Paste Instagram URLs (one per line)")
     
-    col1, col2, col3 = st.columns(3)
+    url_input = st.text_area(
+        "Instagram URLs",
+        value=default_urls,
+        height=200,
+        label_visibility="collapsed"
+    )
     
     with col1:
         max_downloads = st.number_input(
@@ -292,12 +314,12 @@ Or just go to Step 1 first to extract from Excel!""",
             max_value=10.0, 
             value=2.0,
             step=0.5,
-            help="Recommended: 2 seconds. Min: 0.5 seconds. Higher = more reliable, lower = faster. For 100+ images, use 2-3 seconds to avoid rate limiting."
+            help="Recommended: 2 seconds. Min: 0.5 seconds. Higher = more reliable, lower = faster."
         )
     
     st.markdown("---")
     
-    if st.button("🚀 Start Downloading", type="primary", disabled=not url_input):
+    if st.button("🚀 Start Downloading", type="primary"):
         shortcodes = extract_shortcodes_from_text(url_input)
         
         if not shortcodes:

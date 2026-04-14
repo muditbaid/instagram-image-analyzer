@@ -5,3 +5,4 @@ python-dotenv>=1.0.0
 instaloader>=4.15
 streamlit>=1.28.0
 selenium>=4.0.0
+webdriver-manager>=4.0.0
