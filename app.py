@@ -280,19 +280,12 @@ Or just go to Step 1 first to extract from Excel!""",
             "Max images to download", 
             min_value=1, 
             max_value=2000, 
-            value=100, 
+            value=50, 
             step=10,
-            help="Limit to manage time and storage"
+            help="How many images to download"
         )
     
     with col2:
-        output_folder = st.text_input(
-            "Output folder", 
-            value="downloaded_images",
-            help="Where to save downloaded images"
-        )
-    
-    with col3:
         delay = st.number_input(
             "Delay (seconds)", 
             min_value=0.5, 
@@ -314,13 +307,19 @@ Or just go to Step 1 first to extract from Excel!""",
             
             st.info(f"📥 Starting download of {len(shortcodes)} images...")
             
-            output_dir = Path(output_folder)
-            output_dir.mkdir(parents=True, exist_ok=True)
+            # Use temp directory for cloud deployment
+            import tempfile
+            import zipfile
+            import os
+            
+            temp_dir = tempfile.mkdtemp()
+            output_dir = Path(temp_dir)
             
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            results = {"success": 0, "skipped": 0, "error": 0}
+            results = {"success": 0, "error": 0}
+            downloaded_files = []
             errors = []
             
             for i, shortcode in enumerate(shortcodes):
@@ -331,8 +330,7 @@ Or just go to Step 1 first to extract from Excel!""",
                 
                 if result["status"] == "success":
                     results["success"] += 1
-                elif result["status"] == "skipped":
-                    results["skipped"] += 1
+                    downloaded_files.append(output_dir / f"{shortcode}.jpg")
                 else:
                     results["error"] += 1
                     errors.append(f"{shortcode}: {result['message']}")
@@ -343,56 +341,62 @@ Or just go to Step 1 first to extract from Excel!""",
             
             st.markdown("---")
             
-            # Calculate success rate
-            total_attempts = results["success"] + results["error"]
-            success_rate = (results["success"] / total_attempts * 100) if total_attempts > 0 else 0
-            
-            if results["error"] == 0:
-                st.success(f"""
-                ### ✅ Download Complete!
+            if results["success"] > 0:
+                # Create zip file
+                zip_path = Path(temp_dir) / "instagram_images.zip"
                 
-                - ✅ New: {results['success']}
-                - ⏭️ Already existed: {results['skipped']}
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for img_path in downloaded_files:
+                        if img_path.exists():
+                            zipf.write(img_path, img_path.name)
                 
-                Saved to: `{output_folder}/`
-                """)
-            elif success_rate > 70:
-                st.warning(f"""
-                ### ⚠️ Download Complete (some failures)
+                # Read zip for download
+                with open(zip_path, 'rb') as f:
+                    zip_data = f.read()
                 
-                - ✅ New: {results['success']}
-                - ⏭️ Already existed: {results['skipped']}
-                - ❌ Failed: {results['error']} ({100-success_rate:.0f}% failure rate)
+                # Clean up individual images (keep zip for now)
+                for img_path in downloaded_files:
+                    if img_path.exists():
+                        img_path.unlink()
                 
-                Saved to: `{output_folder}/`
+                # Success message
+                if results["error"] == 0:
+                    st.success(f"### ✅ Downloaded {results['success']} images!")
+                else:
+                    st.warning(f"### ⚠️ Downloaded {results['success']} images ({results['error']} failed)")
                 
-                Some posts may be private, deleted, or rate-limited.
-                """)
+                # Download button
+                st.download_button(
+                    label=f"📥 Download {results['success']} Images (ZIP)",
+                    data=zip_data,
+                    file_name="instagram_images.zip",
+                    mime="application/zip",
+                    type="primary"
+                )
+                
+                st.info("💾 Save the ZIP file to your computer, then extract it!")
             else:
-                st.error(f"""
-                ### ❌ Too Many Failures ({results['error']} failed, {100-success_rate:.0f}% failure rate)
-                
-                **Get a session ID for reliable downloads:**
-                Go to **🔑 Get Session ID** page in the sidebar!
-                
-                Saved to: `{output_folder}/`
-                """)
+                st.error("❌ No images downloaded. Try getting a session ID.")
             
+            # Show errors
             if errors and len(errors) <= 10:
                 with st.expander("⚠️ Show errors"):
                     for err in errors:
                         st.text(err)
             
-            # Count total images
-            existing = list(output_dir.glob("*.jpg"))
-            st.info(f"📁 Total images in folder: **{len(existing)}**")
+            # Clean up temp directory
+            try:
+                import shutil
+                shutil.rmtree(temp_dir)
+            except:
+                pass
             
             if results['success'] > 0:
                 st.markdown("""
                 ---
                 ### Next Step: 📝 Generate Gemini Prompt
                 
-                Go to the prompt generator to create instructions for Gemini!
+                Upload the images folder to Gemini and create your prompt!
                 """)
 
 
