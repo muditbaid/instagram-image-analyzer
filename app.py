@@ -297,6 +297,8 @@ https://www.instagram.com/reel/C20NPYHJssM/"""
         label_visibility="collapsed"
     )
     
+    col1, col2 = st.columns(2)
+    
     with col1:
         max_downloads = st.number_input(
             "Max images to download", 
